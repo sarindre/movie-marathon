@@ -1,0 +1,15 @@
+{
+  "name": "movie-marathon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plan a movie marathon: enter movies and get a suggested order.",
+  "scripts": {
+    "start": "node serve.js",
+    "test": "node tests/run.js",
+    "test:unit": "node tests/run.js unit",
+    "setup": "npm install --prefix desktop && npm install --prefix mobile",
+    "desktop": "npm start --prefix desktop",
+    "desktop:build": "npm run dist --prefix desktop",
+    "mobile:sync": "npm run sync --prefix mobile"
+  }
+}
