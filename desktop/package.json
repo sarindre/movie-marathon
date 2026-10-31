@@ -1,0 +1,21 @@
+{
+  "name": "movie-marathon-desktop",
+  "productName": "Movie Marathon",
+  "version": "1.0.0",
+  "description": "Plan a movie marathon: enter movies and get a suggested order.",
+  "author": "Movie Marathon",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node copy-web.js && electron-builder --win nsis --publish never"
+  },
+  "build": {
+    "appId": "com.example.moviemarathon",
+    "productName": "Movie Marathon",
+    "files": ["main.js", "web/**/*", "build/icon.png"],
+    "directories": { "output": "dist" },
+    "win": { "icon": "build/icon.png", "target": "nsis", "signAndEditExecutable": false },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Movie-Marathon-Setup.exe" }
+  },
+  "devDependencies": { "electron": "^33.0.0", "electron-builder": "^25.1.8" }
+}

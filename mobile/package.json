@@ -1,0 +1,13 @@
+{
+  "name": "movie-marathon-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0"
+  },
+  "scripts": {
+    "sync": "node copy-web.js && cap sync"
+  }
+}
