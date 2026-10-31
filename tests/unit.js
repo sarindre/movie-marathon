@@ -65,4 +65,24 @@ t("delete falls back", Object.keys(d.lists).length === 1 && d.lists[d.current]);
 St.remove(d, d.current);
 t("deleting the last makes a fresh one", Object.keys(d.lists).length === 1 && d.lists[d.current].movies.length === 0);
 t("unique names", St.uniqueName(d, "My marathon") === "My marathon 2");
+
+// seasonal theme by date
+const T = require(web + "theme.js");
+const dates = { "2026-01-10": "winter", "2026-02-10": "valentine", "2026-02-20": "winter", "2026-03-12": "stpatrick", "2026-03-18": "spring", "2026-07-02": "july4", "2026-07-05": "summer", "2026-09-15": "autumn", "2026-10-31": "halloween", "2026-11-10": "autumn", "2026-11-20": "thanksgiving", "2026-11-30": "thanksgiving", "2026-12-01": "christmas", "2026-12-25": "christmas" };
+for (const [d, expected] of Object.entries(dates)) t("theme on " + d + " is " + expected, T.themeForDate(new Date(d + "T12:00:00")) === expected, T.themeForDate(new Date(d + "T12:00:00")));
+
+// backup export / import
+const store = { current: "a", lists: {
+  a: { name: "One", movies: [{ id: "1", title: "A", minutes: 100 }, { id: "2", title: "B", minutes: 90, pin: 0, watched: true }], settings: { strategy: "shortest", brk: 5, budget: "3", start: "20:00", date: "", buffer: 5 }, order: ["1"], live: null },
+  b: { name: "Two", movies: [], settings: St.defaults(), order: null, live: null },
+} };
+const backup = Sh.exportAll(store);
+const plans = Sh.parseExport(backup);
+t("backup round trip", plans.length === 2 && plans[0].name === "One" && plans[0].movies[1].pin === 0 && plans[0].movies[1].watched && plans[0].settings.budget === "3" && plans[0].order.length === 1 && plans[1].movies.length === 0);
+t("backup marks the app", JSON.parse(backup).app === "movie-marathon");
+for (const bad of ["nope", "{}", '{"app":"x","marathons":[]}', '{"app":"movie-marathon","marathons":"no"}']) {
+  let threw2 = false; try { Sh.parseExport(bad); } catch { threw2 = true; }
+  t("rejects " + bad.slice(0, 30), threw2);
+}
+t("skips broken entries but keeps good ones", Sh.parseExport(JSON.stringify({ app: "movie-marathon", marathons: ["!!bad!!", JSON.parse(backup).marathons[0]] })).length === 1);
 console.log(fails ? fails + " FAILED" : "ALL PASSED");

@@ -92,5 +92,25 @@
     return lines.join("\r\n") + "\r\n";
   }
 
-  return { encodePlan, decodePlan, toText, toICS };
+  // Backup file: every marathon as a share code, so imports get the same validation as links.
+  function exportAll(data) {
+    return JSON.stringify({
+      app: "movie-marathon", version: 1, exported: new Date().toISOString(),
+      marathons: Object.values(data.lists).map((c) => encodePlan({ name: c.name, movies: c.movies, settings: c.settings, orderedIds: c.order || [] })),
+    }, null, 2);
+  }
+
+  // Returns decoded plans; throws if the file isn't one of ours. Marathons that fail are skipped.
+  function parseExport(text, newId) {
+    if (text.length > 2_000_000) throw new Error("file too large");
+    const f = JSON.parse(text);
+    if (!f || f.app !== "movie-marathon" || !Array.isArray(f.marathons)) throw new Error("not a Movie Marathon backup");
+    const plans = [];
+    for (const code of f.marathons.slice(0, 100)) {
+      try { plans.push(decodePlan(String(code), newId)); } catch {}
+    }
+    return plans;
+  }
+
+  return { encodePlan, decodePlan, toText, toICS, exportAll, parseExport };
 });

@@ -31,7 +31,7 @@ app.whenReady().then(async () => {
   await set("strategy", "balanced"); check("balanced", (await order()) === "CBAD", await order());
   check("total", /8h 10m total/.test(await q("#result h2")), await q("#result h2"));
   await set("budget", "5"); await set("strategy", "bestfit"); check("bestfit 5h picks A+C", (await order()) === "AC");
-  check("didn't fit shown", /Didn't fit/.test(await q("#result .hint")));
+  check("didn't fit shown", /Didn't fit/.test(await q("#result .skipped")));
   await set("strategy", "shortest"); check("shortest 5h picks B+D", (await order()) === "BD");
   await set("budget", "0.5"); check("nothing fits", /Nothing fits/.test(await q("#result")));
   await set("budget", "");
@@ -151,6 +151,7 @@ app.whenReady().then(async () => {
   check("last movie hints", /last movie/.test(await q("#live-next")) && /finish/.test(await q("#live-done")));
   await click("#live-done");
   check("complete screen", /Marathon complete/.test(await q("#live-head")));
+  check("summary lists what you watched", (await count("#live-summary li")) === 3 && /3 movies, 3h 00m of film/.test(await q("#live-sub")), await q("#live-sub"));
   await click("#live-close");
   check("closing returns to plan; all watched", !(await js("document.getElementById('live').hidden")) === false && /watched everything/.test(await q("#result")));
   check("watched marks were saved", (await count(".watched-box:checked")) === 3);
@@ -178,6 +179,64 @@ app.whenReady().then(async () => {
   check("print is black on white", (await js("getComputedStyle(document.body).backgroundColor")) === "rgb(255, 255, 255)");
   await shot("print");
   await win.webContents.debugger.sendCommand("Emulation.setEmulatedMedia", { media: "screen" });
+
+  // ---------- keyboard reordering ----------
+  await fresh(); await seed(); await set("strategy", "shortest");   // B D A C
+  const key = (idx, k, alt) => js(`document.querySelectorAll('#result ol li')[${idx}].dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},altKey:${!!alt},bubbles:true,cancelable:true}))`);
+  const focusedId = () => js("document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id");
+  const idAt = (idx) => js(`document.querySelectorAll('#result ol li')[${idx}].dataset.id`);
+  await js("document.querySelectorAll('#result ol li')[0].focus()");
+  const bId = await idAt(0);
+  await key(0, "ArrowDown", true);
+  check("Alt+Down moves the row", (await order()) === "DBAC", await order());
+  check("focus follows the moved row", (await focusedId()) === bId);
+  await key(1, "ArrowUp", true);
+  check("Alt+Up moves it back", (await order()) === "BDAC", await order());
+  await key(0, "ArrowUp", true);
+  check("Alt+Up at the top does nothing", (await order()) === "BDAC");
+  await key(2, "p", false);
+  check("P pins the focused row", (await count("#result .pin.on")) === 1 && (await js("document.querySelectorAll('#result ol li')[2].querySelector('.pin').classList.contains('on')")));
+  check("rows are keyboard focusable", (await js("[...document.querySelectorAll('#result ol li')].every(l=>l.tabIndex===0)")) === true);
+  await js("document.querySelector('#result ol li:nth-child(2) .down').click()");
+  check("▼ button keeps focus on the same button", (await js("document.activeElement.className")) === "down" || (await js("document.activeElement.tagName")) === "LI");
+
+  // ---------- backup: export and import ----------
+  await fresh(); await seed(); await set("strategy", "shortest");
+  await click("#result ol li:nth-child(3) .pin");
+  await js("window.__blob=null;URL.createObjectURL=(b)=>{window.__blob=b;return 'blob:x'};HTMLAnchorElement.prototype.click=function(){window.__dl=this.download};0");
+  await click("#m-new"); await dlg("Second list", "#dlg-ok"); await add("Solo", 1, 20);
+  await click("#export-btn");
+  const backup = await js("window.__blob.text()");
+  const parsed = JSON.parse(backup);
+  check("export file is named and marked", /^movie-marathons-\d{4}-\d\d-\d\d\.json$/.test(await js("window.__dl")) && parsed.app === "movie-marathon" && parsed.marathons.length === 2, await js("window.__dl"));
+  await fresh();
+  const importText = (text) => js(`(()=>{const dt=new DataTransfer();dt.items.add(new File([${JSON.stringify(text)}],'b.json',{type:'application/json'}));const i=document.getElementById('import-file');i.files=dt.files;i.dispatchEvent(new Event('change'))})()`);
+  await importText(backup); await sleep(800);
+  check("import adds both marathons", (await js("marathon.options.length")) === 3 && /Imported 2 marathons/.test(await q("#toast")), await q("#toast"));
+  const names = await js("[...marathon.options].map(o=>o.textContent).join('|')");
+  check("imported names kept", /My marathon/.test(names) && /Second list/.test(names), names);
+  await js("(()=>{const s=document.getElementById('marathon');s.selectedIndex=1;s.dispatchEvent(new Event('input'))})()");
+  check("imported marathon has its movies, pin and settings", (await count("#list li")) === 4 && (await count("#result .pin.on")) === 1 && (await js("document.getElementById('strategy').value")) === "shortest");
+  await importText("this is not json"); await sleep(600);
+  check("a bad file is rejected politely", /isn't a Movie Marathon backup/.test(await q("#toast")) && (await js("marathon.options.length")) === 3);
+  await importText(JSON.stringify({ app: "something-else", marathons: [] })); await sleep(600);
+  check("a foreign json file is rejected", /isn't a Movie Marathon backup/.test(await q("#toast")) && (await js("marathon.options.length")) === 3);
+
+  // ---------- extra holiday themes ----------
+  await js("document.getElementById('display-menu').open=true");
+  check("12 theme choices (auto + 11)", (await js("document.getElementById('theme').options.length")) === 12);
+  for (const t of ["stpatrick", "july4", "thanksgiving"]) { await set("theme", t); check("theme " + t, (await js("document.documentElement.dataset.theme")) === t); }
+  await set("theme", "auto");
+
+  // ---------- accessibility: every control has a name ----------
+  await fresh(); await seed(); await set("strategy", "shortest");
+  if (!win.webContents.debugger.isAttached()) win.webContents.debugger.attach("1.3");
+  await js("document.getElementById('display-menu').open=true");
+  const ax = await win.webContents.debugger.sendCommand("Accessibility.getFullAXTree");
+  const unnamed = ax.nodes.filter((n) => !n.ignored && ["button", "textbox", "combobox", "checkbox", "spinbutton", "link", "searchbox", "slider"].includes(n.role && n.role.value) && !(n.name && n.name.value && n.name.value.trim()));
+  check("all controls have accessible names", unnamed.length === 0, unnamed.map((n) => n.role.value + ":" + (n.backendDOMNodeId)).join(","));
+  const names2 = ax.nodes.filter((n) => !n.ignored && n.role && n.role.value === "textbox").map((n) => n.name && n.name.value);
+  check("movie title box is named", names2.includes("Movie title"), names2.join("|"));
 
   // ---------- lookup still fills in the runtime (live network) ----------
   await fresh();

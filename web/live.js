@@ -31,7 +31,7 @@ const Live = (() => {
 
   function start(ids) {
     if (!ids.length) return;
-    cur().live = { order: ids, i: 0, phase: "movie", t0: Date.now() };
+    cur().live = { order: ids, i: 0, phase: "movie", t0: Date.now(), startedAt: Date.now() };
     App.persist();
     App.render();
   }
@@ -41,7 +41,7 @@ const Live = (() => {
     if (l.phase === "movie") {
       const m = movie(l.order[l.i]);
       if (m) m.watched = true;
-      if (l.i + 1 >= l.order.length) l.phase = "finished";
+      if (l.i + 1 >= l.order.length) { l.phase = "finished"; l.finishedAt = Date.now(); }
       else { l.i++; l.phase = brkMs() > 0 ? "break" : "movie"; l.t0 = Date.now(); }
     } else if (l.phase === "break") {
       l.phase = "movie";
@@ -70,15 +70,20 @@ const Live = (() => {
     let head, body;
     if (l.phase === "finished") {
       head = "Marathon complete 🎉";
-      body = el("p", { id: "live-sub", textContent: `You watched ${l.order.length} movie${l.order.length === 1 ? "" : "s"}. Nice work.` });
+      const films = l.order.map(movie);
+      const watched = films.reduce((t, f) => t + f.minutes, 0);
+      const wall = l.startedAt && l.finishedAt ? Math.round((l.finishedAt - l.startedAt) / 60000) : null;
+      body = el("div", { id: "live-summary" },
+        el("p", { id: "live-sub", textContent: `You watched ${films.length} movie${films.length === 1 ? "" : "s"}, ${formatDuration(watched)} of film${wall ? ` in ${formatDuration(wall)} from start to finish` : ""}. Nice work.` }),
+        el("ol", { className: "summary-list" }, ...films.map((f) => el("li", { textContent: `${f.title} (${formatDuration(f.minutes)})` }))));
     } else {
       head = l.phase === "movie" ? "Now playing" : "Break time ☕";
       body = el("div", { className: "live-body" },
         el("div", {},
           el("p", { id: "live-title", className: "live-title", textContent: l.phase === "movie" ? m.title : `Next: ${m.title}` }),
           el("p", { id: "live-sub", className: "hint", textContent: `Movie ${l.i + 1} of ${l.order.length}` }),
-          el("p", { id: "live-timer", className: "live-timer" }),
-          el("progress", { id: "live-bar", max: 1, value: 0 }),
+          el("p", { id: "live-timer", className: "live-timer", role: "timer" }),
+          el("progress", { id: "live-bar", max: 1, value: 0, ariaLabel: "Progress through this part of the marathon" }),
           el("p", { id: "live-next", className: "hint" }),
           el("p", { id: "live-end", className: "hint" })));
     }

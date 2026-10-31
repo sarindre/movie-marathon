@@ -9,6 +9,9 @@
 [data-theme="valentine"] { --bg: #1d0f17; --panel: #2e1624; --text: #ffeaf2; --accent: #ff4d8d; --accent-text: #2a0014; --border: #4d2a3d; --hover: #3d1c30; --glow: rgba(255, 77, 141, .22); }
 [data-theme="spring"]    { --bg: #12201a; --panel: #1b3025; --text: #eefaf0; --accent: #7bd88f; --accent-text: #06210f; --border: #2f5240; --hover: #254033; --glow: rgba(123, 216, 143, .2); }
 [data-theme="summer"]    { --bg: #0b1a26; --panel: #12293a; --text: #fff8e1; --accent: #ffb703; --accent-text: #2a1c00; --border: #1f4560; --hover: #19364d; --glow: rgba(255, 183, 3, .22); }
+[data-theme="stpatrick"] { --bg: #0c1a10; --panel: #14301b; --text: #effaf0; --accent: #2fbf5b; --accent-text: #04200c; --border: #24573a; --hover: #1c4128; --glow: rgba(47, 191, 91, .22); }
+[data-theme="july4"]     { --bg: #0b1226; --panel: #131d3d; --text: #f1f4ff; --accent: #e63946; --accent-text: #fff; --border: #2a3a73; --hover: #1c2b5c; --glow: rgba(230, 57, 70, .2); }
+[data-theme="thanksgiving"] { --bg: #1a1209; --panel: #2b1d0e; --text: #fbefdc; --accent: #c8452c; --accent-text: #fff; --border: #5a3a1c; --hover: #3a2812; --glow: rgba(200, 69, 44, .22); }
 [data-theme="autumn"]    { --bg: #1c130c; --panel: #2e2012; --text: #fbeedd; --accent: #d9822b; --accent-text: #1f0f00; --border: #4a3320; --hover: #3b2917; --glow: rgba(217, 130, 43, .22); }
 
 /* Light mode keeps each theme's accent but needs darker "ink" for text on a light background. */
@@ -19,6 +22,9 @@
 [data-mode="light"][data-theme="valentine"] { --ink: #c01a5e; }
 [data-mode="light"][data-theme="spring"]    { --ink: #2a7d3e; }
 [data-mode="light"][data-theme="summer"]    { --ink: #9a6200; }
+[data-mode="light"][data-theme="stpatrick"] { --ink: #1f7a3d; }
+[data-mode="light"][data-theme="july4"]     { --ink: #b3202d; }
+[data-mode="light"][data-theme="thanksgiving"] { --ink: #a8321a; }
 [data-mode="light"][data-theme="autumn"]    { --ink: #9a5210; }
 [data-mode="dark"][data-theme] { --ink: var(--accent); }
 
@@ -37,6 +43,8 @@ button:disabled { opacity: .4; cursor: default; }
 #hours, #mins { width: 4rem; }
 #add button, button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .hint { opacity: .65; }
+.small { font-size: .8rem; }
+.summary-list { padding-left: 1.4rem; line-height: 1.7; }
 .meta { font-size: .85rem; margin: .25rem 0; color: var(--ink); }
 
 /* top bar */
@@ -50,8 +58,11 @@ button:disabled { opacity: .4; cursor: default; }
 #display-menu summary { cursor: pointer; border: 1px solid var(--border); border-radius: 6px; list-style: none; user-select: none; }
 #display-menu summary::-webkit-details-marker { display: none; }
 #display-menu .menu { position: absolute; right: 0; top: calc(100% + .35rem); background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: .75rem; display: flex; flex-direction: column; gap: .6rem; min-width: 11rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); z-index: 20; }
+  border-radius: 8px; padding: .75rem; display: flex; flex-direction: column; gap: .6rem; min-width: 12rem; max-width: 16rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); z-index: 20; }
 #display-menu .menu label { display: flex; flex-direction: column; gap: .25rem; }
+#display-menu .menu-sep { font-weight: 700; color: var(--ink); margin-top: .25rem; border-top: 1px solid var(--border); padding-top: .6rem; }
+#display-menu .menu .small { font-size: .75rem; margin: 0; }
+#display-menu { max-width: 100%; }
 
 /* saved marathons + banner */
 #marathons { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; margin-bottom: 1rem; }

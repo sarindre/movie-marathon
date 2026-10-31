@@ -18,7 +18,7 @@
   <div class="bar-right">
     <label class="theme-pick">Theme <select id="theme" aria-label="Theme"></select></label>
     <details id="display-menu">
-      <summary>⚙ Display</summary>
+      <summary>⚙ Settings</summary>
       <div class="menu">
         <label>Mode
           <select id="mode">
@@ -34,6 +34,11 @@
             <option value="xlarge">Extra large</option>
           </select>
         </label>
+        <div class="menu-sep">Backup</div>
+        <p class="hint small">Your marathons only live on this device. Save a copy to keep them safe or move them elsewhere.</p>
+        <button id="export-btn" type="button">⬇ Export marathons</button>
+        <button id="import-btn" type="button">⬆ Import marathons</button>
+        <input id="import-file" type="file" accept=".json,application/json" hidden aria-label="Choose a backup file">
       </div>
     </details>
   </div>
@@ -51,7 +56,7 @@
   </div>
 
   <form id="add">
-    <input id="title" placeholder="Movie title (type to look up)" autocomplete="off" required>
+    <input id="title" placeholder="Movie title (type to look up)" aria-label="Movie title" autocomplete="off" required>
     <input id="hours" type="number" min="0" max="9" placeholder="h" aria-label="Hours">
     <input id="mins" type="number" min="0" max="59" placeholder="min" aria-label="Minutes">
     <button>Add</button>
@@ -97,7 +102,7 @@
 <dialog id="dlg">
   <form method="dialog">
     <p id="dlg-msg"></p>
-    <input id="dlg-input" autocomplete="off" maxlength="60">
+    <input id="dlg-input" autocomplete="off" maxlength="60" aria-labelledby="dlg-msg">
     <menu>
       <button value="ok" id="dlg-ok">OK</button>
       <button value="cancel" id="dlg-cancel" formnovalidate>Cancel</button>

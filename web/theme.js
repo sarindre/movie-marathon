@@ -12,14 +12,20 @@
     spring:    { label: "Spring",         icon: "🌸", bg: "#12201a" },
     summer:    { label: "Summer",         icon: "☀️", bg: "#0b1a26" },
     autumn:    { label: "Autumn",         icon: "🍂", bg: "#1c130c" },
+    stpatrick: { label: "St. Patrick's",  icon: "☘️", bg: "#0c1a10" },
+    july4:     { label: "4th of July",    icon: "🎆", bg: "#0b1226" },
+    thanksgiving: { label: "Thanksgiving", icon: "🦃", bg: "#1a1209" },
   };
 
   // Holidays win over the plain season.
   function themeForDate(d = new Date()) {
     const m = d.getMonth() + 1, day = d.getDate();
     if (m === 10) return "halloween";
-    if (m === 12 && day >= 1) return "christmas";
+    if (m === 11 && day >= 20) return "thanksgiving";
+    if (m === 12) return "christmas";
     if (m === 2 && day <= 14) return "valentine";
+    if (m === 3 && day >= 10 && day <= 17) return "stpatrick";
+    if (m === 7 && day <= 4) return "july4";
     if (m >= 3 && m <= 5) return "spring";
     if (m >= 6 && m <= 8) return "summer";
     if (m >= 9 && m <= 11) return "autumn";

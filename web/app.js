@@ -6,6 +6,7 @@ const App = (() => {
   let editing = null;                    // id of the movie row being edited
   let lastPlan = { ordered: [], skipped: [] };
   let lookupTimer, lookupSeq = 0;
+  let pendingFocus = null;               // { id, sel? } row (or its button) to refocus after a re-render
 
   const cur = () => data.lists[data.current];
   const persist = () => Store.save(data);
@@ -56,6 +57,14 @@ const App = (() => {
       dlg.showModal();
       if (input) $("dlg-input").select();
     });
+  }
+
+  function download(text, filename, type) {
+    const a = el("a", { href: URL.createObjectURL(new Blob([text], { type })), download: filename });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
   function banner(text) {
@@ -218,11 +227,7 @@ const App = (() => {
   function downloadICS() {
     const { items, start } = currentItems();
     const ics = Share.toICS({ name: cur().name, items, date: cur().settings.date || todayISO(), start });
-    const a = el("a", { href: URL.createObjectURL(new Blob([ics], { type: "text/calendar" })), download: `${cur().name.replace(/[^\w-]+/g, "-")}.ics` });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    download(ics, `${cur().name.replace(/[^\w-]+/g, "-")}.ics`, "text/calendar");
     toast("Calendar file downloaded. Open it to add the movies.");
   }
 
@@ -250,15 +255,32 @@ const App = (() => {
       pin.onclick = () => togglePin(i);
       const up = el("button", { className: "up", type: "button", textContent: "▲", disabled: i === 0 });
       up.setAttribute("aria-label", `Move ${it.title} earlier`);
-      up.onclick = () => move(i, i - 1);
+      up.onclick = () => { pendingFocus = { id: it.id, sel: ".up" }; move(i, i - 1); };
       const down = el("button", { className: "down", type: "button", textContent: "▼", disabled: i === items.length - 1 });
       down.setAttribute("aria-label", `Move ${it.title} later`);
-      down.onclick = () => move(i, i + 1);
+      down.onclick = () => { pendingFocus = { id: it.id, sel: ".down" }; move(i, i + 1); };
 
-      const li = el("li", { draggable: true },
+      const li = el("li", { draggable: true, tabIndex: 0 },
         el("span", { className: "ptext", textContent: `${it.title} (${formatDuration(it.runtime)}) — ${formatClock(start, it.start)} to ${formatClock(start, it.end)}` }),
         el("span", { className: "ctrls" }, pin, up, down));
       li.dataset.id = it.id;
+      li.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown P");
+      // Keyboard alternative to dragging: Alt+Up/Down moves the row, P pins it.
+      li.addEventListener("keydown", (e) => {
+        if (e.target !== li) return;
+        if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+          const to = i + (e.key === "ArrowUp" ? -1 : 1);
+          if (to < 0 || to >= items.length) return e.preventDefault();
+          e.preventDefault();
+          pendingFocus = { id: it.id };
+          move(i, to);
+          toast(`${it.title} is now number ${to + 1}`);
+        } else if (e.key.toLowerCase() === "p" && !e.altKey && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          pendingFocus = { id: it.id };
+          togglePin(i);
+        }
+      });
       li.addEventListener("dragstart", (e) => { dragFrom = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); li.classList.add("dragging"); });
       li.addEventListener("dragover", (e) => { if (dragFrom !== null) { e.preventDefault(); li.classList.add("over"); } });
       li.addEventListener("dragleave", () => li.classList.remove("over"));
@@ -267,10 +289,11 @@ const App = (() => {
       ol.append(li);
     });
 
-    result.replaceChildren(h, actionsBar(live.filter((m) => !isPinned(m)).length > 1), ...notes.map((n) => el("p", { className: "meta", textContent: n })), ol);
+    result.replaceChildren(h, actionsBar(live.filter((m) => !isPinned(m)).length > 1), ...notes.map((n) => el("p", { className: "meta", textContent: n })),
+      el("p", { className: "hint small", textContent: "Tip: drag a row, or click it and press Alt+↑ / Alt+↓ to move it and P to pin it." }), ol);
     if (lastPlan.skipped.length) {
       result.append(el("p", {
-        className: "hint",
+        className: "hint skipped",
         textContent: (lastPlan.ordered.length ? "Didn't fit: " : "Nothing fits in that time: ") +
           lastPlan.skipped.map((m) => `${m.title} (${formatDuration(m.runtime)})`).join(", "),
       }));
@@ -278,6 +301,14 @@ const App = (() => {
     $("print-head").replaceChildren(
       el("h2", { textContent: c.name }),
       el("p", { textContent: `${s.date || todayISO()} · starts ${formatClock(start, 0)} · ends ${formatClock(start, total)} · ${formatDuration(total)} total` }));
+
+    // Re-rendering rebuilds the rows, so put keyboard focus back where it was.
+    if (pendingFocus) {
+      const row = [...ol.children].find((x) => x.dataset.id === String(pendingFocus.id));
+      const btn = pendingFocus.sel && row && row.querySelector(pendingFocus.sel);
+      (btn && !btn.disabled ? btn : row)?.focus();
+      pendingFocus = null;
+    }
   }
 
   function render() {
@@ -362,6 +393,32 @@ const App = (() => {
       $(id).addEventListener("input", () => { readInputs(); cur().order = null; persist(); render(); });
     }
     for (const id of ["start", "date"]) $(id).addEventListener("input", () => { readInputs(); persist(); render(); });
+
+    // Backup: export every marathon to a file, import from one.
+    $("export-btn").onclick = () => {
+      download(Share.exportAll(data), `movie-marathons-${todayISO()}.json`, "application/json");
+      toast("Backup downloaded.");
+    };
+    $("import-btn").onclick = () => $("import-file").click();
+    $("import-file").addEventListener("change", async () => {
+      const file = $("import-file").files[0];
+      $("import-file").value = "";
+      if (!file) return;
+      try {
+        const plans = Share.parseExport(await file.text());
+        if (!plans.length) throw new Error("empty");
+        for (const p of plans) {
+          const id = Store.create(data, Store.uniqueName(data, p.name));
+          Object.assign(data.lists[id], { movies: p.movies, settings: { ...Store.defaults(), ...p.settings }, order: p.order });
+        }
+        persist();
+        switchTo(data.current);
+        $("display-menu").open = false;
+        toast(`Imported ${plans.length} marathon${plans.length === 1 ? "" : "s"}.`);
+      } catch {
+        toast("That file isn't a Movie Marathon backup.");
+      }
+    });
 
     $("reset-watched").onclick = () => { cur().movies.forEach((m) => delete m.watched); persist(); render(); };
     $("banner-close").onclick = () => ($("banner").hidden = true);
