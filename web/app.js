@@ -144,7 +144,7 @@ const App = (() => {
     const edit = el("button", { className: "edit", type: "button", textContent: "✎" });
     edit.setAttribute("aria-label", `Edit ${m.title}`);
     edit.onclick = () => { editing = m.id; render(); };
-    const del = el("button", { className: "remove", type: "button", textContent: "✕" });
+    const del = el("button", { className: "remove", type: "button", textContent: "×" });
     del.setAttribute("aria-label", `Remove ${m.title}`);
     del.onclick = () => { cur().movies = cur().movies.filter((o) => o.id !== m.id); persist(); render(); };
     return el("li", {}, el("span", { className: "left" }, box, label), el("span", { className: "right" }, edit, del));
@@ -215,10 +215,18 @@ const App = (() => {
     return bar;
   }
 
+  // Links always point at the real site, so ones copied from an embedded copy (itch.io) still work.
+  // Only local development uses its own address.
+  const CANONICAL = "https://sarindre.github.io/movie-marathon/";
+  function shareBase() {
+    const local = ["localhost", "127.0.0.1"].includes(location.hostname);
+    return local ? location.origin + location.pathname : CANONICAL;
+  }
+
   function shareLink() {
     const c = cur();
     const code = Share.encodePlan({ name: c.name, movies: c.movies, settings: c.settings, orderedIds: lastPlan.ordered.map((m) => m.id) });
-    copy(`${location.origin}${location.pathname}#m=${code}`, "Link copied. Anyone who opens it gets this marathon.");
+    copy(`${shareBase()}#m=${code}`, "Link copied. Anyone who opens it gets this marathon.");
   }
   function shareText() {
     const { items, total, start } = currentItems();

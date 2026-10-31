@@ -10,6 +10,7 @@
     "setup": "npm install --prefix desktop && npm install --prefix mobile",
     "desktop": "npm start --prefix desktop",
     "desktop:build": "npm run dist --prefix desktop",
-    "mobile:sync": "npm run sync --prefix mobile"
+    "mobile:sync": "npm run sync --prefix mobile",
+    "itch": "node tools/itch.js"
   }
 }

@@ -40,6 +40,7 @@ npm run test:unit    # just the fast unit tests
 | `desktop/` | Electron wrapper. `npm run desktop` runs it, `npm run desktop:build` makes the Windows installer in `desktop/dist/`. |
 | `mobile/`  | Capacitor project for Android. `npm run mobile:sync` copies `web/` into it, then open `mobile/android` in Android Studio. |
 | `tests/`   | Unit tests and browser tests (Electron drives the real page). |
+| `tools/`   | `npm run itch` builds the itch.io upload (zip + screenshots) into `itch/`. The page copy is in `itch/PAGE.md`. |
 
 Code map inside `web/`: `ordering.js` (planning logic), `share.js` (links, text, calendar, backups),
 `store.js` (saved marathons), `app.js` (the page), `live.js` (now-playing), `theme.js` (themes and display settings),

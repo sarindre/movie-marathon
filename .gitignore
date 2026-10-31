@@ -8,3 +8,6 @@ mobile/www/
 
 # The installer is big: publish it as a GitHub Release, not in git
 web/downloads/*.exe
+
+# itch.io build (regenerate with `npm run itch`)
+itch/*.zip
