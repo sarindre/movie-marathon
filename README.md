@@ -1,6 +1,8 @@
 # Movie Marathon Planner
 
 Enter the movies you want to watch and get a suggested order, with start and end times for each one.
+**Live site: <https://sarindre.github.io/movie-marathon/>** · [Windows installer](https://github.com/sarindre/movie-marathon/releases/latest)
+
 It runs as a website, a Windows desktop app and an Android app, all from the same code in `web/`.
 
 ## What it does
@@ -46,8 +48,9 @@ Code map inside `web/`: `ordering.js` (planning logic), `share.js` (links, text,
 ## Publishing
 
 - **The site**: the `web/` folder is the whole site. `.github/workflows/pages.yml` publishes it to GitHub Pages on every push to `main`.
-- **The Windows installer** is about 80 MB, so it is not kept in git. Build it with `npm run desktop:build` and attach
-  `desktop/dist/Movie-Marathon-Setup.exe` to a GitHub Release.
+- **The Windows installer** is about 80 MB, so it is not kept in git. Build it with `npm run desktop:build`, then attach
+  `desktop/dist/Movie-Marathon-Setup.exe` to a new GitHub Release (`gh release create vX.Y.Z desktop/dist/Movie-Marathon-Setup.exe`).
+  The site's download button points at the latest release.
 - The installer is **not code-signed**, so Windows SmartScreen shows an "unknown publisher" warning until it is.
 - The **Android app** has not been built or tested on a device yet.
 
