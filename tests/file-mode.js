@@ -17,6 +17,7 @@ app.whenReady().then(async () => {
   check("install section hidden in the app", (await js("document.getElementById('get-app').hidden")) === true);
   await js("document.getElementById('start-live').click()");
   check("now-playing works", /Now playing/.test(await js("document.getElementById('live-head').innerText")));
+  check("HorrorHub link is in the desktop app too", (await js("!!document.querySelector('#site-footer a[href=\"https://sarindre.itch.io/horrorhub\"]')")) === true);
   check("no console errors", errors.length === 0, errors.join("|"));
   console.log(fails ? fails + " FAILED" : "ALL PASSED");
   app.exit(fails ? 1 : 0);

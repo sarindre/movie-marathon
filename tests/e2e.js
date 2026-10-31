@@ -180,6 +180,13 @@ app.whenReady().then(async () => {
   await shot("print");
   await win.webContents.debugger.sendCommand("Emulation.setEmulatedMedia", { media: "screen" });
 
+  // ---------- HorrorHub link ----------
+  await fresh();
+  const hub = await js("(()=>{const a=document.querySelector('#site-footer a');return a&&{href:a.href,target:a.target,rel:a.rel,text:a.textContent,visible:a.getBoundingClientRect().height>0}})()");
+  check("footer links to HorrorHub", hub && hub.href === "https://sarindre.itch.io/horrorhub" && hub.text === "HorrorHub" && hub.visible, JSON.stringify(hub));
+  check("link opens in a new tab safely", hub && hub.target === "_blank" && /noopener/.test(hub.rel));
+  check("footer is visible with no movies and with movies", (await js("document.getElementById('site-footer').getBoundingClientRect().height>0")) && (await seed(), await js("document.getElementById('site-footer').getBoundingClientRect().height>0")));
+
   // ---------- keyboard reordering ----------
   await fresh(); await seed(); await set("strategy", "shortest");   // B D A C
   const key = (idx, k, alt) => js(`document.querySelectorAll('#result ol li')[${idx}].dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},altKey:${!!alt},bubbles:true,cancelable:true}))`);
