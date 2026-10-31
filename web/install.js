@@ -29,8 +29,7 @@
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
   document.getElementById("ios-tip").hidden = !ios;
 
-  // Only offer downloads that actually exist on this server.
-  for (const a of document.querySelectorAll("a[data-download]")) {
-    fetch(a.getAttribute("href"), { method: "HEAD" }).then((r) => { a.hidden = !r.ok; }).catch(() => {});
-  }
+  // The installer is a GitHub Release. When running locally with a built copy in downloads/, prefer that.
+  const dl = document.getElementById("dl-windows");
+  fetch("downloads/Movie-Marathon-Setup.exe", { method: "HEAD" }).then((r) => { if (r.ok) dl.href = "downloads/Movie-Marathon-Setup.exe"; }).catch(() => {});
 })();
