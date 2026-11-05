@@ -8,12 +8,13 @@ It runs as a website, a Windows desktop app and an Android app, all from the sam
 ## What it does
 
 - **Plans an order**: shortest first, longest first, balanced, or **best fit**, which picks the combination of movies that fills your available time.
-- **Time limit, breaks and extra time** per movie for trailers and credits.
-- **Shuffle**, drag-and-drop (or Alt+Up/Down) reordering, and **pins** that hold a movie in its slot.
+- **Time limit or finish-by time**, breaks, one longer **meal break**, and extra time per movie for trailers and credits.
+- **Shuffle**, drag-and-drop (or Alt+Up/Down) reordering, **pins** that hold a movie in its slot, and **series** so sequels always play after the original.
+- **Paste a list** of titles (with runtimes, or looked up) and **undo** an accidental remove.
 - **Look up runtimes** by title (Wikidata, no API key).
 - **Share** a marathon as a link or as text, add it to a **calendar** (.ics), or **print** it.
-- **Now playing** mode with a countdown, a break timer and a finish estimate.
-- **Saved marathons**, a watched checklist, and **backup export/import**.
+- **Now playing** mode with a countdown, a break timer, a finish estimate, optional sound and vibration when a part ends, and the screen kept awake.
+- **Saved marathons** (up to 100, 200 movies each), duplicate a marathon, a watched checklist, and **backup export/import**.
 - **Seasonal themes** chosen by date, light/dark mode and a text size setting.
 
 Everything is stored in the browser or app on the device. There is no server and no account.
@@ -44,7 +45,7 @@ npm run test:unit    # just the fast unit tests
 
 Code map inside `web/`: `ordering.js` (planning logic), `share.js` (links, text, calendar, backups),
 `store.js` (saved marathons), `app.js` (the page), `live.js` (now-playing), `theme.js` (themes and display settings),
-`lookup.js` (Wikidata), `sw.js` + `install.js` (offline and install support).
+`lookup.js` (Wikidata), `bulk.js` (pasted lists), `sw.js` + `install.js` (offline and install support).
 
 ## Publishing
 

@@ -245,6 +245,164 @@ app.whenReady().then(async () => {
   const names2 = ax.nodes.filter((n) => !n.ignored && n.role && n.role.value === "textbox").map((n) => n.name && n.name.value);
   check("movie title box is named", names2.includes("Movie title"), names2.join("|"));
 
+  // ---------- undo after removing a movie ----------
+  const stored = () => js(`(()=>{const d=JSON.parse(localStorage.getItem('marathon-data'));return d.lists[d.current].movies})()`);
+  const titles = () => js(`[...document.querySelectorAll('#list .mtitle')].map(e=>e.firstChild.textContent.split(' — ')[0]).join('')`);
+  await fresh(); await seed(); await set("strategy", "shortest");
+  await click("#result ol li:nth-child(3) .pin");                       // pin A
+  await js("document.querySelector('#list li:nth-child(4) .watched-box').click()");   // D watched
+  await click("#list li:nth-child(1) .remove");
+  check("remove shows an Undo button", (await count("#toast .toast-action")) === 1 && /Removed A/.test(await q("#toast")) && (await count("#list li")) === 3, await q("#toast"));
+  await click("#toast .toast-action");
+  check("Undo puts it back in the same place with its pin", (await titles()) === "ABCD" && (await stored())[0].pin === 2 && /Put back A/.test(await q("#toast")), await titles());
+  await click("#list li:nth-child(4) .remove"); await click("#toast .toast-action");
+  check("Undo keeps the watched tick", (await titles()) === "ABCD" && (await stored())[3].watched === true);
+  await click("#list li:nth-child(2) .remove"); await click("#list li:nth-child(2) .remove");
+  await click("#toast .toast-action");
+  check("Undo restores only the most recent removal", (await titles()) === "ACD", await titles());
+  await click("#list li:nth-child(1) .remove");
+  await js("document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true,bubbles:true,cancelable:true}))");
+  check("Ctrl+Z also undoes", (await titles()) === "ACD" && /Put back A/.test(await q("#toast")), await titles());
+  await click("#list li:nth-child(1) .remove");
+  await click("#m-new"); await dlg("Elsewhere", "#dlg-ok");
+  check("switching marathon clears the undo", (await js("document.getElementById('toast').hidden")) === true);
+
+  // ---------- finish by ----------
+  await fresh(); await seed(); await set("strategy", "bestfit"); await set("start", "18:00");
+  await set("finish", "23:00");
+  check("finish by 11 PM plans like a 5h limit", (await order()) === "AC" && /finish by 11:00 PM/.test(await q("#result")), await order());
+  await set("start", "20:00"); await set("finish", "01:00");
+  check("finish by past midnight counts as the next day", (await order()) === "AC", await order());
+  await set("start", "18:00"); await set("finish", "23:00"); await set("budget", "3");
+  const threeH = await order();
+  await set("finish", "");
+  check("the shorter of finish-by and time limit wins", threeH === (await order()) && threeH.length > 0, threeH + " / " + await order());
+  await set("finish", "23:00");
+  check("tells you when the time limit is the one used", /time limit is shorter/.test(await q("#result")));
+  await set("budget", ""); await set("finish", "23:30");
+  await win.loadURL(URL_);
+  check("finish by is remembered", (await js("document.getElementById('finish').value")) === "23:30");
+
+  // ---------- duplicate a marathon ----------
+  await fresh(); await seed(); await set("strategy", "shortest"); await set("buffer", "5");
+  await click("#result ol li:nth-child(1) .down");                       // manual order D B A C -> DBAC
+  const beforeDup = await order();
+  await click("#m-dup");
+  check("duplicate opens a copy with the same plan", (await js("marathon.selectedOptions[0].textContent")) === "My marathon copy" && (await count("#list li")) === 4 && (await order()) === beforeDup && (await js("document.getElementById('buffer').value")) === "5", await order());
+  await click("#list li:nth-child(1) .remove");
+  await js("(()=>{marathon.selectedIndex=0;marathon.dispatchEvent(new Event('input'))})()");
+  check("editing the copy leaves the original alone", (await count("#list li")) === 4 && (await order()) === beforeDup);
+  await click("#m-dup");
+  check("copies get unique names", (await js("marathon.selectedOptions[0].textContent")) === "My marathon copy 2");
+
+  // ---------- meal break ----------
+  await fresh(); await add("A", 1, 30); await add("B", 1, 30); await add("C", 1, 30);
+  await set("strategy", "shortest"); await set("break", "10"); await set("meal-after", "2"); await set("meal-min", "45");
+  check("meal break lengthens the plan", /5h 25m total, ends 11:25 PM/.test(await q("#result h2")), await q("#result h2"));
+  check("third movie starts after the meal break", /9:55 PM to 11:25 PM/.test(await js("document.querySelectorAll('#result .ptext')[2].textContent")));
+  check("the meal break is marked in the list", (await count("#result .meal-tag")) === 1 && /Meal break: 45m after movie 2/.test(await q("#result")), await q("#result"));
+  await js("window.__copied=null;navigator.clipboard.writeText=async(t)=>{window.__copied=t};0");
+  await click("#copy-text"); await sleep(300);
+  check("copied text uses the meal break times", /9:55 PM to 11:25 PM/.test(await js("window.__copied")));
+  await set("budget", "5");
+  check("a 5h limit drops a movie because of the meal break", (await count("#result ol li")) === 2 && /Didn't fit/.test(await q("#result")), await q("#result"));
+  await set("budget", "");
+  await click("#start-live"); await click("#live-done");
+  check("normal break after movie 1", /Break time/.test(await q("#live-head")));
+  await click("#live-next-btn"); await click("#live-done");
+  check("meal break after movie 2", /Meal break/.test(await q("#live-head")) && /^(45:00|44:5\d)$/.test(await q("#live-timer")), await q("#live-head") + " " + await q("#live-timer"));
+  check("end estimate includes the meal break", /about 11:2\d PM/.test(await q("#live-end")) || /to go/.test(await q("#live-end")), await q("#live-end"));
+  await click("#live-stop");
+
+  // ---------- series ----------
+  await fresh(); await seed(); await set("strategy", "longest");           // C A D B
+  const editSeries = (nth, name, num) => js(`(()=>{document.querySelector('#list li:nth-child(${nth}) .edit').click();const f=document.querySelector('.edit-form');f.querySelector('.e-series').value=${JSON.stringify(name)};f.querySelector('.e-seq').value=${JSON.stringify(String(num))};f.requestSubmit()})()`);
+  check("longest first has the sequel first", (await order()) === "CADB", await order());
+  await editSeries(1, "Saga", 1);                                           // A is Saga #1
+  await editSeries(3, "saga", "");                                          // C joins; the number is filled in
+  check("a film without a number goes to the end of its series", (await stored())[2].seq === 2 && (await stored())[2].series === "saga");
+  check("series shows in the list", /Saga #1/.test(await q("#list li:nth-child(1)")), await q("#list li:nth-child(1)"));
+  check("series films play in order even when longest is first", (await order()) === "ACDB", await order());
+  await click("#result ol li:nth-child(1) .down");
+  check("moving a film past its prequel is refused", (await order()) === "ACDB" && /has to stay after/.test(await q("#toast")), await order() + " " + await q("#toast"));
+  await click("#result ol li:nth-child(3) .up");
+  check("other films can still move", (await order()) === "ADCB", await order());
+  let sagaOk = true;
+  for (let i = 0; i < 20; i++) { await click("#shuffle"); const o = await order(); if (o.indexOf("A") > o.indexOf("C")) sagaOk = false; }
+  check("20 shuffles never put the sequel first", sagaOk);
+  await set("strategy", "shortest"); await set("strategy", "longest");     // back to A C D B
+  await js("document.getElementById('toast').hidden=true;document.querySelectorAll('#result ol li')[0].focus()");
+  await key(0, "ArrowDown", true);
+  check("Alt+Down is refused the same way", (await order()) === "ACDB" && !/is now number/.test(await q("#toast")) && /has to stay after/.test(await q("#toast")), (await order()) + " " + (await q("#toast")));
+
+  // ---------- paste a list ----------
+  await fresh();
+  await js("Lookup.searchFilms = async (q) => q === 'Predator' ? [{ id: 'x', title: 'Predator', description: 'film', minutes: 107 }] : []; document.getElementById('bulk').open = true");
+  await set("bulk-text", "Alien 1h57\nAliens, 137\nPredator\nMystery Film\nalien, 99\n\nApollo 13");
+  await click("#bulk-add");
+  for (let i = 0; i < 40 && (await js("document.getElementById('bulk-add').disabled")); i++) await sleep(150);
+  check("pasted movies with runtimes are added", (await titles()) === "AlienAliensPredator", await titles());
+  check("a runtime found online is used and flagged", /1h 47m/.test(await q("#list")) && /found online/.test(await q("#bulk-status")), await q("#bulk-status"));
+  check("movies without a runtime stay in the box", (await js("document.getElementById('bulk-text').value")) === "Mystery Film\nApollo 13" && /2 still need a runtime/.test(await q("#bulk-status")), await js("document.getElementById('bulk-text').value"));
+  check("repeats in the paste are reported", /1 repeated in your paste/.test(await q("#bulk-status")), await q("#bulk-status"));
+  await set("bulk-text", "Mystery Film, 95\nApollo 13 2h20\nalien, 117");
+  await click("#bulk-add");
+  for (let i = 0; i < 40 && (await js("document.getElementById('bulk-add').disabled")); i++) await sleep(150);
+  check("adding the rest works, and movies already listed are skipped", (await titles()) === "AlienAliensPredatorMystery FilmApollo 13" && /1 already in the list/.test(await q("#bulk-status")) && (await js("document.getElementById('bulk-text').value")) === "", await titles());
+  await js("Lookup.searchFilms = async () => { throw new Error('offline'); }; 0");
+  await set("bulk-text", "Some Film");
+  await click("#bulk-add"); await sleep(700);
+  check("offline: titles without a runtime are kept for you to complete", (await js("document.getElementById('bulk-text').value")) === "Some Film" && /1 still needs a runtime/.test(await q("#bulk-status")), await q("#bulk-status"));
+
+  // ---------- limits: 200 movies, 100 marathons ----------
+  await fresh();
+  await js(`(()=>{const c=App.cur();for(let i=0;i<198;i++)c.movies.push({id:'x'+i,title:'M'+i,minutes:90});App.persist();App.render()})()`);
+  await js("document.getElementById('bulk').open = true");
+  await set("bulk-text", "N1, 90\nN2, 90\nN3, 90\nN4, 90\nN5, 90");
+  await click("#bulk-add"); await sleep(500);
+  check("pasting stops at 200 movies and keeps the rest in the box", (await count("#list li")) === 200 && (await js("document.getElementById('bulk-text').value")) === "N3, 90\nN4, 90\nN5, 90" && /full \(200 movies\)/.test(await q("#bulk-status")), await q("#bulk-status"));
+  await add("Z", 1, 0);
+  check("the add form refuses a 201st movie", (await count("#list li")) === 200 && /is full/.test(await q("#toast")), await q("#toast"));
+  await js("window.__copied=null;navigator.clipboard.writeText=async(t)=>{window.__copied=t};0");
+  await click("#copy-link"); await sleep(300);
+  const fullLink = await js("window.__copied");
+  check("a full marathon still makes a share link that opens", !!fullLink && (await js(`(()=>{try{return Share.decodePlan(${JSON.stringify((fullLink || "").split("#m=")[1] || "")}).movies.length}catch(e){return -1}})()`)) === 200);
+  await js(`(()=>{const lists={};for(let i=0;i<100;i++)lists['l'+i]={name:'L'+i,movies:[],settings:{strategy:'bestfit',brk:10,budget:'',start:'18:00',date:'',buffer:0},order:null,live:null};localStorage.setItem('marathon-data',JSON.stringify({current:'l0',lists}))})()`);
+  await win.loadURL(URL_);
+  check("at 100 marathons, New and Duplicate are switched off", (await js("document.getElementById('m-new').disabled && document.getElementById('m-dup').disabled")) === true && /most marathons allowed/.test(await js("document.getElementById('m-new').title")));
+  check("marathons saved before these settings existed still load", (await js("document.getElementById('finish').value")) === "" && (await js("document.getElementById('meal-after').value")) === "");
+
+  // ---------- keep the screen on, and alerts ----------
+  await fresh(); await seed();
+  await js(`window.__wl=0;window.__rel=0;window.__vib=0;navigator.vibrate=()=>{window.__vib++;return true};
+    Object.defineProperty(navigator,'wakeLock',{configurable:true,value:{request:async()=>{window.__wl++;return{release:async()=>{window.__rel++},addEventListener(){}}}}});0`);
+  const nearlyOver = () => js(`(()=>{const l=App.cur().live;const s=App.cur().settings;const m=App.cur().movies.find(x=>x.id===l.order[l.i]);const total=(l.phase==='movie'?(m.minutes+s.buffer):s.brk)*60000;l.t0=Date.now()-total+2500;0})()`);
+  await click("#start-live"); await sleep(400);
+  check("starting a marathon asks to keep the screen on", (await js("window.__wl")) === 1, await js("window.__wl"));
+  await nearlyOver(); await sleep(4200);
+  check("no alert while alerts are off", (await js("window.__vib")) === 0 && /Time's up/.test(await q("#live-timer")), await js("window.__vib"));
+  await click("#live-stop"); await sleep(300);
+  check("stopping lets the screen sleep again", (await js("window.__rel")) === 1, await js("window.__rel"));
+  await js("document.getElementById('display-menu').open=true");
+  await js("document.getElementById('alerts').click()");
+  check("turning alerts on gives a sample and is remembered", (await js("window.__vib")) === 1 && JSON.parse(await js("localStorage.getItem('marathon-display')")).alerts === true, await js("window.__vib"));
+  await js("window.__vib=0;document.getElementById('display-menu').open=false;0");
+  await click("#start-live"); await sleep(400);
+  await nearlyOver(); await sleep(4200);
+  check("alerts fire once when a movie ends", (await js("window.__vib")) === 1, await js("window.__vib"));
+  await sleep(2200);
+  check("and don't repeat", (await js("window.__vib")) === 1);
+  await click("#live-done"); await sleep(300);
+  await nearlyOver(); await sleep(4200);
+  check("alerts also fire when a break ends", (await js("window.__vib")) === 2, await js("window.__vib"));
+  await click("#live-stop");
+  await js("Object.defineProperty(navigator,'wakeLock',{configurable:true,value:{request:async()=>{throw new Error('denied')}}});0");
+  await click("#start-live"); await sleep(400);
+  check("a refused wake lock doesn't break the marathon", /Now playing/.test(await q("#live-head")));
+  await click("#live-stop");
+
+  check("no console errors so far", errors.length === 0, errors.slice(0, 3).join(" | "));
+
   // ---------- lookup still fills in the runtime (live network) ----------
   await fresh();
   await set("title", "Inception");

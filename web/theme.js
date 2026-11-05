@@ -40,9 +40,12 @@
   const DKEY = "marathon-display";
   const SIZES = { normal: "100%", large: "118%", xlarge: "135%" };
   const display = () => {
-    try { return { mode: "dark", size: "normal", ...JSON.parse(localStorage.getItem(DKEY) || "{}") }; }
-    catch { return { mode: "dark", size: "normal" }; }
+    try { return { mode: "dark", size: "normal", alerts: false, ...JSON.parse(localStorage.getItem(DKEY) || "{}") }; }
+    catch { return { mode: "dark", size: "normal", alerts: false }; }
   };
+  // "Alert me when a movie or break ends": a device setting, so it isn't part of any marathon or share link.
+  const alertsOn = () => !!display().alerts;
+  const setAlerts = (on) => localStorage.setItem(DKEY, JSON.stringify({ ...display(), alerts: !!on }));
   const prefersDark = () => !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   function apply() {
@@ -63,7 +66,7 @@
     const d = display();
     modeSel.value = d.mode;
     sizeSel.value = SIZES[d.size] ? d.size : "normal";
-    const save = () => { localStorage.setItem(DKEY, JSON.stringify({ mode: modeSel.value, size: sizeSel.value })); apply(); };
+    const save = () => { localStorage.setItem(DKEY, JSON.stringify({ ...display(), mode: modeSel.value, size: sizeSel.value })); apply(); };
     modeSel.addEventListener("input", save);
     sizeSel.addEventListener("input", save);
     if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
@@ -84,5 +87,5 @@
     select.addEventListener("input", () => { localStorage.setItem(KEY, select.value); apply(); });
   }
 
-  return { themes, themeForDate, apply, initPicker, initDisplay };
+  return { themes, themeForDate, apply, initPicker, initDisplay, alertsOn, setAlerts };
 });

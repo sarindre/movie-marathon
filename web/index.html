@@ -34,6 +34,7 @@
             <option value="xlarge">Extra large</option>
           </select>
         </label>
+        <label class="check"><input id="alerts" type="checkbox"> Sound and vibrate when a movie or break ends</label>
         <div class="menu-sep">Backup</div>
         <p class="hint small">Your marathons only live on this device. Save a copy to keep them safe or move them elsewhere.</p>
         <button id="export-btn" type="button">⬇ Export marathons</button>
@@ -51,18 +52,27 @@
   <div id="marathons">
     <label>Marathon <select id="marathon" aria-label="Saved marathons"></select></label>
     <button id="m-new" type="button">＋ New</button>
+    <button id="m-dup" type="button">⧉ Duplicate</button>
     <button id="m-rename" type="button">✎ Rename</button>
     <button id="m-delete" type="button">🗑 Delete</button>
   </div>
 
   <form id="add">
-    <input id="title" placeholder="Movie title (type to look up)" aria-label="Movie title" autocomplete="off" required>
+    <input id="title" placeholder="Movie title (type to look up)" aria-label="Movie title" autocomplete="off" maxlength="120" required>
     <input id="hours" type="number" min="0" max="9" placeholder="h" aria-label="Hours">
     <input id="mins" type="number" min="0" max="59" placeholder="min" aria-label="Minutes">
     <button>Add</button>
   </form>
 
   <ul id="suggestions" hidden></ul>
+
+  <details id="bulk">
+    <summary>Paste a list of movies</summary>
+    <p class="hint small">One movie per line. Add the runtime at the end if you know it, like “Alien 1h57” or “Aliens, 137”. Movies without one are looked up online.</p>
+    <textarea id="bulk-text" rows="6" aria-label="Movies, one per line" placeholder="Alien 1h57&#10;Aliens, 137&#10;Predator"></textarea>
+    <div><button id="bulk-add" type="button">Add these movies</button></div>
+    <p id="bulk-status" class="hint" role="status"></p>
+  </details>
 
   <div id="list-head"><button id="reset-watched" type="button" hidden>↺ Reset watched</button></div>
   <ul id="list"></ul>
@@ -81,6 +91,9 @@
     <label>Time available (hours, optional) <input id="budget" type="number" min="0" step="0.25" placeholder="no limit"></label>
     <label>Date <input id="date" type="date"></label>
     <label>Start time <input id="start" type="time" value="18:00"></label>
+    <label title="Plan so the marathon is over by this time. If it is earlier than the start time, it means the next day.">Finish by (optional) <input id="finish" type="time"></label>
+    <label title="One longer break, such as dinner, after this many movies">Meal break after movie # <input id="meal-after" type="number" min="0" max="50" placeholder="none"></label>
+    <label>Meal break (min) <input id="meal-min" type="number" min="0" max="180" placeholder="e.g. 45"></label>
   </section>
 
   <div id="print-head"></div>
@@ -117,6 +130,7 @@
 
 <script src="ordering.js"></script>
 <script src="lookup.js"></script>
+<script src="bulk.js"></script>
 <script src="store.js"></script>
 <script src="share.js"></script>
 <script src="app.js"></script>

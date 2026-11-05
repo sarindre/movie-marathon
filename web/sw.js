@@ -1,6 +1,6 @@
 // Caches the app shell so the planner works offline once installed.
-const CACHE = "marathon-v5";
-const SHELL = ["./", "index.html", "style.css", "ordering.js", "lookup.js", "app.js", "install.js", "theme.js", "store.js", "share.js", "live.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const CACHE = "marathon-v6";
+const SHELL = ["./", "index.html", "style.css", "ordering.js", "lookup.js", "bulk.js", "app.js", "install.js", "theme.js", "store.js", "share.js", "live.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

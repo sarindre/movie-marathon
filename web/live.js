@@ -9,9 +9,12 @@ const Live = (() => {
   const cur = () => App.cur();
   const st = () => cur().live;
   const movie = (id) => cur().movies.find((m) => m.id === id);
-  const brkMs = () => cur().settings.brk * 60000;
+  const meal = () => { const s = cur().settings; return s.mealAfter > 0 && s.mealMin > 0 ? { after: s.mealAfter, min: s.mealMin } : null; };
+  // The gap once `count` movies have been played: the usual break, or the meal break.
+  const gapMin = (count) => Ordering.gapAfter(count, cur().settings.brk, meal());
+  const gapMs = (count) => gapMin(count) * 60000;
   const movieMs = (m) => (m.minutes + cur().settings.buffer) * 60000;
-  const phaseMs = (l) => (l.phase === "movie" ? movieMs(movie(l.order[l.i])) : l.phase === "break" ? brkMs() : 0);
+  const phaseMs = (l) => (l.phase === "movie" ? movieMs(movie(l.order[l.i])) : l.phase === "break" ? gapMs(l.i) : 0);
 
   function fmt(ms) {
     const s = Math.max(0, Math.ceil(ms / 1000));
@@ -25,13 +28,14 @@ const Live = (() => {
     if (l.phase === "finished") return 0;
     let rest = Math.max(0, phaseMs(l) - (now - l.t0));
     const first = l.phase === "movie" ? l.i + 1 : l.i;
-    for (let k = first; k < l.order.length; k++) rest += movieMs(movie(l.order[k])) + (l.phase === "movie" || k > first ? brkMs() : 0);
+    for (let k = first; k < l.order.length; k++) rest += movieMs(movie(l.order[k])) + (l.phase === "movie" || k > first ? gapMs(k) : 0);
     return rest;
   }
 
   function start(ids) {
     if (!ids.length) return;
     cur().live = { order: ids, i: 0, phase: "movie", t0: Date.now(), startedAt: Date.now() };
+    if (Theme.alertsOn()) unlockAudio();              // starting is a tap, which lets the browser play sounds later
     App.persist();
     App.render();
   }
@@ -42,7 +46,7 @@ const Live = (() => {
       const m = movie(l.order[l.i]);
       if (m) m.watched = true;
       if (l.i + 1 >= l.order.length) { l.phase = "finished"; l.finishedAt = Date.now(); }
-      else { l.i++; l.phase = brkMs() > 0 ? "break" : "movie"; l.t0 = Date.now(); }
+      else { l.i++; l.phase = gapMs(l.i) > 0 ? "break" : "movie"; l.t0 = Date.now(); }
     } else if (l.phase === "break") {
       l.phase = "movie";
       l.t0 = Date.now();
@@ -57,8 +61,70 @@ const Live = (() => {
     App.render();
   }
 
+  // ---------- keep the screen on, and alert when a part ends ----------
+  let wake = null, wakeBusy = false, wantAwake = false, audio = null, armed = null, alerted = null;
+
+  // Settles on the most recent request even if calls overlap. Never throws: if the browser has no
+  // wake lock or refuses it, the marathon simply works without one.
+  async function keepAwake(on) {
+    wantAwake = on;
+    if (wakeBusy) return;
+    wakeBusy = true;
+    try {
+      for (let tries = 0; tries < 3 && wantAwake !== !!wake; tries++) {
+        if (wantAwake) {
+          if (!navigator.wakeLock) break;
+          wake = await navigator.wakeLock.request("screen");
+          if (wake && wake.addEventListener) wake.addEventListener("release", () => { wake = null; });
+        } else {
+          const w = wake;
+          wake = null;
+          await w.release();
+        }
+      }
+    } catch { wake = null; }
+    wakeBusy = false;
+  }
+  // The browser drops the lock when the tab is hidden, so ask again when it comes back.
+  document.addEventListener("visibilitychange", () => {
+    const l = st();
+    if (document.visibilityState === "visible" && l && l.phase !== "finished") keepAwake(true);
+  });
+
+  function unlockAudio() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume();
+    } catch {}
+  }
+  document.addEventListener("pointerdown", () => { if (st() && Theme.alertsOn()) unlockAudio(); }, { passive: true });
+
+  function beep() {
+    try {
+      if (!audio) return;
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 880;
+      g.gain.value = 0.15;
+      o.connect(g);
+      g.connect(audio.destination);
+      o.start();
+      o.stop(audio.currentTime + 0.6);
+    } catch {}
+  }
+  function alertNow() {
+    beep();
+    try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch {}
+  }
+  // Lets the user hear and feel the alert when they switch it on.
+  function preview() {
+    unlockAudio();
+    beep();
+    try { if (navigator.vibrate) navigator.vibrate(200); } catch {}
+  }
+
   function render() {
     const root = $("live"), l = st();
+    keepAwake(!!l && l.phase !== "finished");
     if (!l) { root.hidden = true; clearInterval(timer); timer = null; return false; }
     l.order = l.order.filter(movie);                       // a movie may have been deleted meanwhile
     l.i = Math.min(l.i, Math.max(l.order.length - 1, 0));
@@ -77,7 +143,8 @@ const Live = (() => {
         el("p", { id: "live-sub", textContent: `You watched ${films.length} movie${films.length === 1 ? "" : "s"}, ${formatDuration(watched)} of film${wall ? ` in ${formatDuration(wall)} from start to finish` : ""}. Nice work.` }),
         el("ol", { className: "summary-list" }, ...films.map((f) => el("li", { textContent: `${f.title} (${formatDuration(f.minutes)})` }))));
     } else {
-      head = l.phase === "movie" ? "Now playing" : "Break time ☕";
+      const isMeal = l.phase === "break" && gapMin(l.i) > cur().settings.brk;
+      head = l.phase === "movie" ? "Now playing" : isMeal ? "Meal break 🍽" : "Break time ☕";
       body = el("div", { className: "live-body" },
         el("div", {},
           el("p", { id: "live-title", className: "live-title", textContent: l.phase === "movie" ? m.title : `Next: ${m.title}` }),
@@ -109,10 +176,15 @@ const Live = (() => {
     timerEl.classList.toggle("over", left <= 0);
     $("live-bar").value = total ? Math.min(1, Math.max(0, 1 - left / total)) : 1;
 
+    // Alert only when we watched the time run out, so reopening a marathon that ended long ago stays quiet.
+    const key = `${l.i}|${l.phase}|${l.t0}`;
+    if (left > 0) armed = key;
+    else if (armed === key && alerted !== key) { alerted = key; if (Theme.alertsOn()) alertNow(); }
+
     const hasNext = l.phase === "movie" ? l.i + 1 < l.order.length : true;
     if (hasNext) {
       const nextMovie = movie(l.order[l.phase === "movie" ? l.i + 1 : l.i]);
-      const startsAt = now + Math.max(0, left) + (l.phase === "movie" ? brkMs() : 0);
+      const startsAt = now + Math.max(0, left) + (l.phase === "movie" ? gapMs(l.i + 1) : 0);
       $("live-next").textContent = l.phase === "movie" ? `Up next: ${nextMovie.title} at about ${clock(startsAt)}` : `Starts at about ${clock(startsAt)}`;
     } else {
       $("live-next").textContent = "This is the last movie.";
@@ -121,5 +193,5 @@ const Live = (() => {
     $("live-end").textContent = `Marathon ends about ${clock(now + rest)} (${formatDuration(Math.ceil(rest / 60000))} to go)`;
   }
 
-  return { start, render, active: () => !!st() };
+  return { start, render, preview, active: () => !!st() };
 })();

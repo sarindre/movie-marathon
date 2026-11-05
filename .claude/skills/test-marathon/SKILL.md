@@ -19,8 +19,12 @@ Always run `npm run test:unit` first. It is quick and catches most logic regress
 ## Running the browser tests here
 
 1. Check Electron exists: `ls desktop/node_modules/electron/dist`. If it's missing, run `npm run setup`.
-2. Run `npm test`. The Wikidata checks fail without internet. Say so explicitly. Don't hide the failure, and don't remove the check.
-3. To save screenshots from the e2e run, set `OUT=<dir>`. Use a scratchpad folder, not the repo.
+2. Run `npm test`. On a headless Linux box running as root (like the cloud sessions), Electron needs a display and `--no-sandbox`, so `npm test` fails at launch. Start `node serve.js` in the background, then run each suite by hand:
+   `BASE_URL=http://localhost:8080/ xvfb-run -a desktop/node_modules/electron/dist/electron --no-sandbox tests/e2e.js`
+   `xvfb-run -a desktop/node_modules/electron/dist/electron --no-sandbox tests/file-mode.js`
+   Two traps in `tests/e2e.js`: `js(...)` can't return a function or DOM object (end the expression with `; 0`), and content inside a closed `<details>` has empty `innerText` (open it first).
+3. The Wikidata checks fail without internet. Say so explicitly. Don't hide the failure, and don't remove the check.
+4. To save screenshots from the e2e run, set `OUT=<dir>`. Use a scratchpad folder, not the repo.
 
 ## Reading failures
 

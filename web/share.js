@@ -5,6 +5,9 @@
 })(typeof self !== "undefined" ? self : this, function (Ordering) {
   const { formatDuration, formatClock } = Ordering;
 
+  // Hard limits, so a list can always be shared, backed up and restored.
+  const LIMITS = { movies: 200, marathons: 100 };
+
   const toB64 = (str) => {
     let bin = "";
     for (const b of new TextEncoder().encode(str)) bin += String.fromCharCode(b);
@@ -17,12 +20,15 @@
   };
 
   // orderedIds = the plan as displayed, so the receiver sees the same order.
+  // New fields are only ever appended to the movie rows ("m") and the settings list ("s"), so links
+  // made by older versions still open. Older versions ignore the extra fields.
   function encodePlan({ name, movies, settings, orderedIds }) {
     const idx = new Map(movies.map((m, i) => [m.id, i]));
     return toB64(JSON.stringify({
       v: 1, n: name,
-      m: movies.map((m) => [m.title, m.minutes, m.watched ? 1 : 0, Number.isInteger(m.pin) ? m.pin : -1]),
-      s: [settings.strategy, settings.brk, settings.budget, settings.start, settings.date, settings.buffer],
+      m: movies.map((m) => [m.title, m.minutes, m.watched ? 1 : 0, Number.isInteger(m.pin) ? m.pin : -1, m.series || "", m.series && m.seq ? m.seq : 0]),
+      s: [settings.strategy, settings.brk, settings.budget, settings.start, settings.date, settings.buffer,
+        settings.finishBy || "", settings.mealAfter || 0, settings.mealMin || 0],
       o: orderedIds.map((id) => idx.get(id)).filter((i) => i !== undefined),
     }));
   }
@@ -35,14 +41,16 @@
   function decodePlan(str, newId = uid) {
     const p = JSON.parse(fromB64(str));
     if (!p || p.v !== 1 || !Array.isArray(p.m) || !Array.isArray(p.s)) throw new Error("bad share link");
-    if (p.m.length > 200) throw new Error("too many movies");
+    if (p.m.length > LIMITS.movies) throw new Error("too many movies");
     const movies = p.m.map((r) => {
       const movie = { id: newId(), title: String(r[0] || "Untitled").slice(0, 120), minutes: num(r[1], 1, 2000, 90) };
       if (r[2]) movie.watched = true;
-      if (Number.isInteger(r[3]) && r[3] >= 0 && r[3] < 200) movie.pin = r[3];
+      if (Number.isInteger(r[3]) && r[3] >= 0 && r[3] < LIMITS.movies) movie.pin = r[3];
+      const series = typeof r[4] === "string" ? r[4].trim().slice(0, 60) : "";
+      if (series) { movie.series = series; const seq = num(r[5], 0, 999, 0); if (seq) movie.seq = seq; }
       return movie;
     });
-    const [strategy, brk, budget, start, date, buffer] = p.s;
+    const [strategy, brk, budget, start, date, buffer, finishBy, mealAfter, mealMin] = p.s;
     const order = (Array.isArray(p.o) ? p.o : []).filter((i) => movies[i] && !Number.isInteger(movies[i].pin)).map((i) => movies[i].id);
     return {
       name: String(p.n || "Shared marathon").slice(0, 60),
@@ -55,6 +63,9 @@
         start: /^\d\d:\d\d$/.test(start) ? start : "18:00",
         date: /^\d{4}-\d\d-\d\d$/.test(date) ? date : "",
         buffer: num(buffer, 0, 60, 0),
+        finishBy: /^\d\d:\d\d$/.test(finishBy) ? finishBy : "",
+        mealAfter: num(mealAfter, 0, LIMITS.movies, 0),
+        mealMin: num(mealMin, 0, 180, 0),
       },
     };
   }
@@ -106,11 +117,11 @@
     const f = JSON.parse(text);
     if (!f || f.app !== "movie-marathon" || !Array.isArray(f.marathons)) throw new Error("not a Movie Marathon backup");
     const plans = [];
-    for (const code of f.marathons.slice(0, 100)) {
+    for (const code of f.marathons.slice(0, LIMITS.marathons)) {
       try { plans.push(decodePlan(String(code), newId)); } catch {}
     }
     return plans;
   }
 
-  return { encodePlan, decodePlan, toText, toICS, exportAll, parseExport };
+  return { LIMITS, encodePlan, decodePlan, toText, toICS, exportAll, parseExport };
 });
